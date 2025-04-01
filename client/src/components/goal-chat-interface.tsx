@@ -191,7 +191,7 @@ export function GoalChatInterface() {
         <form onSubmit={handleSubmit} className="flex w-full gap-2">
           <Input
             ref={inputRef}
-            placeholder="目標についてアシスタントに質問する..."
+            placeholder="目標についてミライちゃんに質問する..."
             value={messageText}
             onChange={(e) => setMessageText(e.target.value)}
             disabled={sendMessage.isPending}

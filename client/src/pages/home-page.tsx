@@ -329,7 +329,11 @@ export default function HomePage() {
                   borderColor: "rgba(59, 130, 246, 0.4)"
                 }}
               >
-                <Server className="h-4 w-4 sm:h-5 sm:w-5 text-blue-300" />
+                <img
+                  src="/images/mirai.png"
+                  alt="Company Logo"
+                  className="h-full w-full object-contain"
+                />
               </motion.div>
               
               {/* AI Brand Logo integrated */}
@@ -350,7 +354,7 @@ export default function HomePage() {
                   }}
                   transition={{ duration: 3, repeat: Infinity }}
                 >
-                  <Cpu className="h-4 w-4 text-blue-300" />
+                  
                   <span>ミライ</span>
                 </motion.div>
                 

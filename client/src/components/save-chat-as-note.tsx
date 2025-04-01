@@ -61,7 +61,7 @@ export function SaveChatAsNote({ message }: SaveChatAsNoteProps) {
   const handleOpen = (isOpen: boolean) => {
     setIsOpen(isOpen);
     if (isOpen) {
-      setTitle(message.isBot ? "AI Response" : "My Message");
+      setTitle(message.isBot ? "AIの応答" : "私のメッセージ");
       setContent(message.content);
     }
   };

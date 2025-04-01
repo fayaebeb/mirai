@@ -105,7 +105,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!response.ok) {
         // If Langflow API fails, fall back to simple response
         console.error(`Langflow API responded with status ${response.status}`);
-        botResponse = `I am NeoCortex, but I'm having trouble connecting to my brain right now. Please try again later.`;
+        botResponse = `I am ミライ, but I'm having trouble connecting to my brain right now. Please try again later.`;
       } else {
         // Process the Langflow API response
         const aiResponse = await response.json();
@@ -124,7 +124,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         if (!aiOutputText) {
           console.error("Could not extract message from AI response");
-          aiOutputText = `I am NeoCortex Goal Assistant. I've received your message but I'm having trouble formulating a response right now.`;
+          aiOutputText = `I am ミライ Goal Assistant. I've received your message but I'm having trouble formulating a response right now.`;
         }
 
         // Format the bot's response
@@ -330,7 +330,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!response.ok) {
         // If Langflow API fails, fall back to simple response
         console.error(`Langflow API responded with status ${response.status}`);
-        botResponse = `I am NeoCortex, but I'm having trouble connecting to my brain right now. Please try again later.`;
+        botResponse = `I am ミライ, but I'm having trouble connecting to my brain right now. Please try again later.`;
       } else {
         // Process the Langflow API response
         const aiResponse = await response.json();
@@ -349,7 +349,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         if (!aiOutputText) {
           console.error("Could not extract message from AI response");
-          aiOutputText = `I am NeoCortex. I've received your message but I'm having trouble formulating a response right now.`;
+          aiOutputText = `I am ミライ. I've received your message but I'm having trouble formulating a response right now.`;
         }
 
         // Format the bot's response

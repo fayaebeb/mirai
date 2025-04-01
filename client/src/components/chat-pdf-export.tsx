@@ -54,7 +54,7 @@ export function ChatPDFExport({ messages }: ChatPDFExportProps) {
     resolver: zodResolver(exportFormSchema),
     defaultValues: {
       fileName: "chat-export",
-      title: "Chat Conversation",
+      title: "チャットの会話",
       includeTimestamp: true,
       theme: "light",
       quality: "medium",
@@ -84,7 +84,7 @@ export function ChatPDFExport({ messages }: ChatPDFExportProps) {
       const qualityValue = qualityMap[values.quality] || 1.0;
 
       await exportChatToPDF(messages, values.fileName, {
-        title: values.title || "Chat Conversation",
+        title: values.title || "チャットの会話",
         includeTimestamp: values.includeTimestamp,
         theme: values.theme,
         quality: qualityValue,
@@ -154,7 +154,7 @@ export function ChatPDFExport({ messages }: ChatPDFExportProps) {
                   <FormItem>
                     <FormLabel>タイトル</FormLabel>
                     <FormControl>
-                      <Input placeholder="Chat Conversation" {...field} />
+                      <Input placeholder="チャットの会話" {...field} />
                     </FormControl>
                     <FormDescription className="text-xs">
                       PDF内のタイトル

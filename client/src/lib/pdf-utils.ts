@@ -28,7 +28,7 @@ function createChatHTML(
   options: PDFGenerationOptions
 ): HTMLElement {
   const { 
-    title = "Chat Conversation", 
+    title = "チャットの会話", 
     includeTimestamp = true,
     theme = "light",
   } = options;
@@ -151,7 +151,7 @@ function createChatHTML(
     
     // Sender name
     const senderElement = document.createElement('div');
-    senderElement.textContent = message.isBot ? 'AI Assistant' : 'You';
+    senderElement.textContent = message.isBot ? 'ミライ' : 'あなた';
     senderElement.style.fontSize = '14px';
     senderElement.style.fontWeight = 'bold';
     senderElement.style.color = message.isBot ? themeStyles.botNameColor : themeStyles.userNameColor;
@@ -190,6 +190,11 @@ function createChatHTML(
     // Add some styling to the markdown-rendered content
     const styleElement = document.createElement('style');
     styleElement.textContent = `
+    .message-bubble {
+      margin-bottom: 10px;
+      page-break-inside: avoid; 
+    }
+
       .message-bubble a { color: #3B82F6; text-decoration: underline; }
       .message-bubble img { max-width: 100%; border-radius: 4px; }
       .message-bubble pre { background-color: ${theme === 'light' ? '#F1F5F9' : '#1E293B'}; padding: 8px; border-radius: 4px; overflow-x: auto; }
@@ -219,7 +224,7 @@ function createChatHTML(
   footerElement.style.fontSize = '12px';
   footerElement.style.color = themeStyles.timestampColor;
   footerElement.style.textAlign = 'center';
-  footerElement.innerHTML = `<span>ミライちゃん AI – 会話エクスポート</span>`;
+  footerElement.innerHTML = `<span>ミライ – 会話エクスポート</span>`;
   container.appendChild(footerElement);
 
   return container;
@@ -274,10 +279,10 @@ export async function generateChatPDF(
 
     // Set document properties
     pdf.setProperties({
-      title: options.title || "Chat Conversation",
-      author: options.author || "AI Assistant",
-      subject: "Chat Conversation Export",
-      creator: "ミライちゃん AI Assistant",
+      title: options.title || "チャットの会話",
+      author: options.author || "ミライ",
+      subject: "会話エクスポート",
+      creator: "ミライ",
       keywords: "chat, conversation, AI, PDF, export"
     });
 
@@ -287,7 +292,7 @@ export async function generateChatPDF(
     const imgWidth = 210; // A4 width in mm
     const pageHeight = 297; // A4 height in mm
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
-    const pageMargin = 0; // No margins for full-page content
+    const pageMargin = 5; // No margins for full-page content
 
     // Add images to PDF pages with optimized multi-page handling
     let heightLeft = imgHeight;
