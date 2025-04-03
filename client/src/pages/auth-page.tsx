@@ -123,7 +123,11 @@ export default function AuthPage() {
             transition={{ rotate: { duration: 0.5, repeat: 1 } }}
             onClick={addTechParticles}
           >
-            <Cpu size={48} className="text-blue-400" />
+            <img
+              src="/images/mirai.png"  
+              alt="Bot Logo"
+              className="w-full h-full object-contain rounded-full"
+            />
           </motion.div>
           <motion.div
             className="text-xl text-blue-300 font-mono"
@@ -133,6 +137,7 @@ export default function AuthPage() {
             {currentSymbol}
           </motion.div>
         </motion.div>
+
 
         {/* Authentication Card */}
         <motion.div 
@@ -163,6 +168,7 @@ export default function AuthPage() {
               </div>
               <div className="absolute inset-0 flex items-center justify-center">
                 <Server size={30} className="text-blue-400" />
+                
               </div>
             </motion.div>
           </motion.div>
@@ -379,7 +385,11 @@ export default function AuthPage() {
                 }}
                 transition={{ duration: 3, repeat: Infinity }}
               >
-                {currentSymbol}
+                <img
+                  src="/images/mirai.png"
+                  alt="Bot Logo"
+                  className="w-18 h-18 object-contain rounded-full"
+                />
               </motion.div>
             </div>
           </motion.div>
@@ -395,7 +405,7 @@ export default function AuthPage() {
               animate={{ y: [0, -5, 0] }}
               transition={{ duration: 2, repeat: Infinity, repeatType: "reverse" }}
             >
-              <Cpu size={28} className="text-blue-400" />
+              
               <span className="text-2xl font-bold text-blue-300 font-mono">ミライ</span>
             </motion.div>
             <motion.p 
