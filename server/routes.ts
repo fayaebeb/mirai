@@ -726,10 +726,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           output_type: "chat",
           input_type: "chat",
           tweaks: {
-            "TextInput-19PWn": {
+            "TextInput-HMGP4": {
               input_value: notesSessionId,
             },
-            "TextInput-jk8CQ": {
+            "TextInput-kOFX3": {
               input_value: formattedNotes,
             },
           },
