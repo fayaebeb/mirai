@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Note } from "@shared/schema";
+import { Note, Message } from "@shared/schema";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { FileText, Pencil, Trash2, Plus, Download, ExternalLink } from "lucide-react";
+import { FileText, Pencil, Trash2, Plus, Download, Send, MessageSquare, Brain, Bot } from "lucide-react";
 import { exportChatToPDF } from "@/lib/pdf-utils";
 import { format } from "date-fns";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -18,6 +18,10 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import ChatMessage from "@/components/chat-message";
+import { ChatLoadingIndicator } from "@/components/chat-loading-indicator";
+import { useAuth } from "@/hooks/use-auth";
+import { v4 as uuidv4 } from 'uuid';
 
 export function NotesList() {
   const [isAddNoteOpen, setIsAddNoteOpen] = useState(false);
@@ -28,9 +32,25 @@ export function NotesList() {
   const [newNoteContent, setNewNoteContent] = useState("");
   const { toast } = useToast();
 
+  // Note selection state for the chat
+  const [selectedNotes, setSelectedNotes] = useState<Note[]>([]);
+  const [isNoteChatOpen, setIsNoteChatOpen] = useState(false);
+  const [chatInput, setChatInput] = useState("");
+  const [optimisticMessages, setOptimisticMessages] = useState<any[]>([]);
+  const { user } = useAuth();
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
   // Fetch notes
   const { data: notes = [], isLoading, isError } = useQuery<Note[]>({
     queryKey: ['/api/notes'],
+  });
+
+  // Fetch notes chat messages
+  const { data: notesChatMessages = [], isLoading: isLoadingMessages } = useQuery<Message[]>({
+    queryKey: ['/api/messages'],
+    enabled: !!user && isNoteChatOpen,
+    select: (messages) => messages.filter(message => message.sessionId?.startsWith('notes_')),
   });
 
   // Create note mutation
@@ -102,6 +122,54 @@ export function NotesList() {
         variant: "destructive",
       });
     }
+  });
+
+  // Notes Chat mutation
+  const sendNotesChatMessage = useMutation({
+    mutationFn: async (content: string) => {
+      // Create optimistic message
+      const optimisticUserMessage = {
+        id: uuidv4(),
+        userId: user?.id || 0,
+        content,
+        isBot: false,
+        timestamp: new Date(),
+        sessionId: `notes_${user?.id}_${user?.username}`,
+      };
+
+      // Add optimistic message to local state
+      setOptimisticMessages(prev => [...prev, optimisticUserMessage]);
+
+      // Send the message to the server
+      const response = await apiRequest('POST', '/api/notes-chat', {
+        content,
+        notes: selectedNotes,
+      });
+
+      return response.json();
+    },
+    onSuccess: (newBotMessage: Message) => {
+      // Clear optimistic messages when we get a response
+      setOptimisticMessages([]);
+      
+      // Add the new message to the messages list
+      queryClient.setQueryData<Message[]>(['/api/messages'], (oldMessages = []) => {
+        return [
+          ...oldMessages,
+          newBotMessage,
+        ];
+      });
+    },
+    onError: (error) => {
+      // Clear optimistic messages on error
+      setOptimisticMessages([]);
+      
+      toast({
+        title: "Error occurred",
+        description: "Failed to send message. Please try again later.",
+        variant: "destructive",
+      });
+    },
   });
 
   const handleAddNote = () => {
@@ -195,6 +263,48 @@ export function NotesList() {
     }
   };
 
+  // Auto-scroll to the bottom when new messages arrive
+  useEffect(() => {
+    if (scrollAreaRef.current && isNoteChatOpen) {
+      const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      }
+    }
+  }, [notesChatMessages, optimisticMessages, sendNotesChatMessage.isPending, isNoteChatOpen]);
+
+  // Handle chat form submission
+  const handleChatSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim()) return;
+    
+    sendNotesChatMessage.mutate(chatInput);
+    setChatInput("");
+    
+    // Focus back on the input field after sending
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
+  // Toggle note selection for chat
+  const toggleNoteSelection = (note: Note, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent view note dialog from opening
+    
+    if (selectedNotes.some(n => n.id === note.id)) {
+      setSelectedNotes(selectedNotes.filter(n => n.id !== note.id));
+    } else {
+      setSelectedNotes([...selectedNotes, note]);
+    }
+  };
+
+  // All messages including optimistic ones
+  const allChatMessages = [
+    ...notesChatMessages,
+    ...optimisticMessages
+  ].sort((a, b) => {
+    // Sort by timestamp
+    return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+  });
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -202,56 +312,73 @@ export function NotesList() {
           <FileText className="h-5 w-5" />
           Notes
         </h2>
-        <Dialog open={isAddNoteOpen} onOpenChange={setIsAddNoteOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="flex items-center gap-1">
-              <Plus className="h-4 w-4" />
-              <span>Add Note</span>
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[550px]">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Plus className="h-5 w-5" />
-                Create New Note
-              </DialogTitle>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Input
-                  id="title"
-                  placeholder="Note Title"
-                  value={newNoteTitle}
-                  onChange={(e) => setNewNoteTitle(e.target.value)}
-                  className="w-full"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Textarea
-                  id="content"
-                  placeholder="Note Content"
-                  value={newNoteContent}
-                  onChange={(e) => setNewNoteContent(e.target.value)}
-                  className="w-full min-h-[200px]"
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button
-                onClick={() => setIsAddNoteOpen(false)}
-                variant="outline"
-              >
-                Cancel
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            className="flex items-center gap-1" 
+            onClick={() => setIsNoteChatOpen(true)}
+            disabled={notes.length === 0}
+          >
+            <Brain className="h-4 w-4" />
+            <span>Chat with Notes</span>
+            {selectedNotes.length > 0 && (
+              <Badge variant="secondary" className="ml-1">
+                {selectedNotes.length}
+              </Badge>
+            )}
+          </Button>
+          <Dialog open={isAddNoteOpen} onOpenChange={setIsAddNoteOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="flex items-center gap-1">
+                <Plus className="h-4 w-4" />
+                <span>Add Note</span>
               </Button>
-              <Button 
-                onClick={handleAddNote}
-                disabled={createNoteMutation.isPending}
-              >
-                {createNoteMutation.isPending ? "Creating..." : "Create Note"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[550px]">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Plus className="h-5 w-5" />
+                  Create New Note
+                </DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Input
+                    id="title"
+                    placeholder="Note Title"
+                    value={newNoteTitle}
+                    onChange={(e) => setNewNoteTitle(e.target.value)}
+                    className="w-full"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Textarea
+                    id="content"
+                    placeholder="Note Content"
+                    value={newNoteContent}
+                    onChange={(e) => setNewNoteContent(e.target.value)}
+                    className="w-full min-h-[200px]"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  onClick={() => setIsAddNoteOpen(false)}
+                  variant="outline"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleAddNote}
+                  disabled={createNoteMutation.isPending}
+                >
+                  {createNoteMutation.isPending ? "Creating..." : "Create Note"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
       
       <Separator />
@@ -460,6 +587,128 @@ export function NotesList() {
               Edit Note
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Notes Chat Dialog */}
+          <Dialog open={isNoteChatOpen} onOpenChange={setIsNoteChatOpen}>
+            <DialogContent className="sm:max-w-[700px] max-h-[90vh] h-[80vh] overflow-hidden flex flex-col p-0">
+              <DialogHeader className="px-4 py-2 border-b flex items-center justify-between">
+                <DialogTitle>
+                  <div className="flex items-center gap-2">
+                    <Brain className="h-5 w-5 text-blue-500" />
+                    <span>Notes Assistant</span>
+                    {selectedNotes.length > 0 && (
+                      <Badge variant="outline" className="ml-1">
+                        {selectedNotes.length} notes selected
+                      </Badge>
+                    )}
+                  </div>
+                </DialogTitle>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => setSelectedNotes([])}
+                    disabled={selectedNotes.length === 0}
+                    className="text-xs"
+                  >
+                    Clear Selection
+                  </Button>
+                  {/* Default close button provided by the Dialog library */}
+                  
+                </div>
+              </DialogHeader>
+
+          
+          <div className="flex flex-1 overflow-hidden">
+            {/* Notes selection sidebar */}
+            <div className="w-[200px] border-r p-2 hidden sm:block">
+              <h3 className="text-sm font-medium mb-2">Select Notes</h3>
+              <ScrollArea className="h-[calc(80vh-4rem)]">
+                <div className="space-y-1 pr-2">
+                  {notes.map((note) => (
+                    <div
+                      key={`select-${note.id}`}
+                      className={`flex items-center p-2 text-sm rounded cursor-pointer ${
+                        selectedNotes.some(n => n.id === note.id)
+                          ? 'bg-blue-900/30 border border-blue-400/30'
+                          : 'hover:bg-muted'
+                      }`}
+                      onClick={() => toggleNoteSelection(note, { stopPropagation: () => {} } as any)}
+                    >
+                      <div className="flex-1 truncate">
+                        <div className="font-medium truncate">{note.title}</div>
+                        <div className="text-xs text-muted-foreground">{format(new Date(note.updatedAt), 'MMM d')}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
+            
+            {/* Chat area */}
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <ScrollArea ref={scrollAreaRef} className="flex-1 p-4">
+                {isLoadingMessages ? (
+                  <div className="flex h-full items-center justify-center">
+                    <ChatLoadingIndicator message="Loading conversation history..." />
+                  </div>
+                ) : allChatMessages.length === 0 ? (
+                  <div className="flex flex-col h-full items-center justify-center text-center text-muted-foreground p-4">
+                    <Bot className="h-12 w-12 mb-4 text-primary/30" />
+                    <h3 className="text-lg font-medium">Chat with your notes</h3>
+                    <p className="max-w-sm">
+                      {notes.length > 0 ? (
+                        selectedNotes.length > 0 ? (
+                          "Ask questions about your selected notes."
+                        ) : (
+                          "Select notes from the sidebar or ask questions about all your notes."
+                        )
+                      ) : (
+                        "Create some notes first to chat with them."
+                      )}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {allChatMessages.map((message) => (
+                      <ChatMessage 
+                        key={message.id} 
+                        message={message}
+                      />
+                    ))}
+                    {sendNotesChatMessage.isPending && (
+                      <ChatLoadingIndicator variant="minimal" />
+                    )}
+                  </div>
+                )}
+              </ScrollArea>
+              
+              <div className="p-4 border-t">
+                <form onSubmit={handleChatSubmit} className="flex gap-2">
+                  <Input
+                    ref={inputRef}
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    placeholder="Ask a question about your notes..."
+                    className="flex-1"
+                    disabled={sendNotesChatMessage.isPending}
+                  />
+                  <Button 
+                    type="submit" 
+                    size="icon"
+                    disabled={!chatInput.trim() || sendNotesChatMessage.isPending}
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </form>
+                {notes.length > 0 && selectedNotes.length === 0 && (
+                  <p className="mt-2 text-xs text-muted-foreground">No notes selected. The assistant will use all notes.</p>
+                )}
+              </div>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

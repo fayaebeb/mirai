@@ -6,6 +6,7 @@ import { insertMessageSchema, insertNoteSchema, insertGoalSchema } from "@shared
 
 const LANGFLOW_API = process.env.LANGFLOW_API || "";
 const LANGFLOW_API_GOAL = process.env.LANGFLOW_API_GOAL || process.env.LANGFLOW_API || "";
+const LANGFLOW_API_NOTES = process.env.LANGFLOW_API_NOTES || process.env.LANGFLOW_API || "";
 
 // Flag to determine if we should use the goal-specific API
 const USE_GOAL_SPECIFIC_API = true; // Set to true to use the goal-specific API
@@ -90,10 +91,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           output_type: "chat",
           input_type: "chat",
           tweaks: {
-            "TextInput-HMGP4": {
+            "TextInput-19PWn": {
               input_value: goalSessionId,
             },
-            "TextInput-kOFX3": {
+            "TextInput-jk8CQ": {
               input_value: goalsText,
             },
           },
@@ -105,7 +106,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!response.ok) {
         // If Langflow API fails, fall back to simple response
         console.error(`Langflow API responded with status ${response.status}`);
-        botResponse = `I am ミライ, but I'm having trouble connecting to my brain right now. Please try again later.`;
+        botResponse = `I am NeoCortex, but I'm having trouble connecting to my brain right now. Please try again later.`;
       } else {
         // Process the Langflow API response
         const aiResponse = await response.json();
@@ -124,7 +125,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         if (!aiOutputText) {
           console.error("Could not extract message from AI response");
-          aiOutputText = `I am ミライ Goal Assistant. I've received your message but I'm having trouble formulating a response right now.`;
+          aiOutputText = `I am NeoCortex Goal Assistant. I've received your message but I'm having trouble formulating a response right now.`;
         }
 
         // Format the bot's response
@@ -330,7 +331,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!response.ok) {
         // If Langflow API fails, fall back to simple response
         console.error(`Langflow API responded with status ${response.status}`);
-        botResponse = `I am ミライ, but I'm having trouble connecting to my brain right now. Please try again later.`;
+        botResponse = `I am NeoCortex, but I'm having trouble connecting to my brain right now. Please try again later.`;
       } else {
         // Process the Langflow API response
         const aiResponse = await response.json();
@@ -349,7 +350,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         if (!aiOutputText) {
           console.error("Could not extract message from AI response");
-          aiOutputText = `I am ミライ. I've received your message but I'm having trouble formulating a response right now.`;
+          aiOutputText = `I am NeoCortex. I've received your message but I'm having trouble formulating a response right now.`;
         }
 
         // Format the bot's response
@@ -652,6 +653,133 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error retrieving note:", error);
       res.status(500).json({
         message: "Failed to retrieve note",
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+  
+  // Add a dedicated notes chat endpoint
+  app.post("/api/notes-chat", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    // Use a different session ID pattern for notes chat to ensure separation from regular chat
+    const notesSessionId = `notes_${req.user!.id}_${req.user!.username}`;
+    const userContent = req.body.content;
+    const selectedNotes = req.body.notes || [];
+
+    try {
+      // Check if the session with the specific ID exists first
+      const existingNotesSession = await storage.getSessionBySessionId(notesSessionId);
+      if (!existingNotesSession) {
+        console.log(`Creating new notes session for user ${req.user!.id} with sessionId ${notesSessionId}`);
+        await storage.createUserSession(req.user!.id, notesSessionId);
+      }
+
+      // Save the user message with the notes-specific session ID
+      const userMessage = await storage.createMessage(req.user!.id, {
+        content: userContent,
+        isBot: false,
+        sessionId: notesSessionId,
+      });
+
+      console.log(`Sending request to Notes Chat API: ${userContent}`);
+      
+      // Format the selected notes for context
+      let formattedNotes = "";
+      if (selectedNotes && selectedNotes.length > 0) {
+        formattedNotes = selectedNotes.map((note: any) => {
+          const createdDate = new Date(note.createdAt).toLocaleDateString('en-US', { 
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+          });
+          
+          return `Title: ${note.title}\nContent: ${note.content}\nCreated: ${createdDate}\n---`;
+        }).join("\n");
+      } else {
+        // If no notes were explicitly selected, try to get all user notes
+        const allNotes = await storage.getNotesByUserId(req.user!.id);
+        if (allNotes && allNotes.length > 0) {
+          formattedNotes = allNotes.map(note => {
+            const createdDate = new Date(note.createdAt).toLocaleDateString('en-US', { 
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric'
+            });
+            
+            return `Title: ${note.title}\nContent: ${note.content}\nCreated: ${createdDate}\n---`;
+          }).join("\n");
+        } else {
+          formattedNotes = "No notes found.";
+        }
+      }
+      
+      const response = await fetch(LANGFLOW_API_NOTES, {
+        method: "POST",
+        headers: {
+          Authorization: process.env.AUTHORIZATION_TOKEN || "",
+          "Content-Type": "application/json",
+          "x-api-key": process.env.X_API_KEY || "",
+        },
+        body: JSON.stringify({
+          input_value: userContent,
+          output_type: "chat",
+          input_type: "chat",
+          tweaks: {
+            "TextInput-19PWn": {
+              input_value: notesSessionId,
+            },
+            "TextInput-jk8CQ": {
+              input_value: formattedNotes,
+            },
+          },
+        }),
+      });
+
+      let botResponse;
+
+      if (!response.ok) {
+        // If Langflow API fails, fall back to simple response
+        console.error(`Langflow API responded with status ${response.status}`);
+        botResponse = `I am NeoCortex, but I'm having trouble connecting to my brain right now. Please try again later.`;
+      } else {
+        // Process the Langflow API response
+        const aiResponse = await response.json();
+        console.log("Langflow API Response:", JSON.stringify(aiResponse, null, 2));
+
+        let aiOutputText = null;
+
+        if (aiResponse.outputs && Array.isArray(aiResponse.outputs)) {
+          const firstOutput = aiResponse.outputs[0];
+          if (firstOutput?.outputs?.[0]?.results?.message?.data?.text) {
+            aiOutputText = firstOutput.outputs[0].results.message.data.text;
+          } else if (firstOutput?.outputs?.[0]?.messages?.[0]?.message) {
+            aiOutputText = firstOutput.outputs[0].messages[0].message;
+          }
+        }
+
+        if (!aiOutputText) {
+          console.error("Could not extract message from AI response");
+          aiOutputText = `I am NeoCortex Notes Assistant. I've received your message but I'm having trouble formulating a response right now.`;
+        }
+
+        // Format the bot's response
+        botResponse = formatBotResponse(aiOutputText);
+      }
+
+      // Save the bot response to the database
+      const botMessage = await storage.createMessage(req.user!.id, {
+        content: botResponse,
+        isBot: true,
+        sessionId: notesSessionId,
+      });
+
+      // Return the bot message
+      res.json(botMessage);
+    } catch (error) {
+      console.error("Error processing notes chat message:", error);
+      res.status(500).json({
+        message: "Failed to process notes chat message",
         error: error instanceof Error ? error.message : "Unknown error",
       });
     }
